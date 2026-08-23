@@ -2,13 +2,22 @@
 Pixyz SDK -- Tessellate
 =======================================================
 
+Usage parameters example:
+Tesellate the entire scene: --maxSag=0.2 --maxLength=-1 --maxAngle=-1 --createNormals=True --uvMode=0 --uvChannel=1 --uvPadding=0.0 --createTangents=False --createFreeEdges=False --keepBRepShape=True --overrideExistingTessellation=False
+All the values are defaulted in the scrip, so it is also possible to call the script without parameters and it will tessellate the full scene
+
+Tessellate by name: This will perform a search in the scene by name, and only tessallate the occurrances that matches
+--selectBy=name --selectValue=NameOfOccurance --maxSag=0.2 --maxLength=-1 --maxAngle=-1 --createNormals=True --uvMode=0 --uvChannel=1 --uvPadding=0.0 --createTangents=False --createFreeEdges=False --keepBRepShape=True --overrideExistingTessellation=False
+
+Tessellate by Metadata: This will perform a search in the scene by metadata, and only tessallate the occurrances that matches
+--selectBy=metadata --selectValue=metadataValue --selectKey=keyName --maxSag=0.2 --maxLength=-1 --maxAngle=-1 --createNormals=True --uvMode=0 --uvChannel=1 --uvPadding=0.0 --createTangents=False --createFreeEdges=False --keepBRepShape=True --overrideExistingTessellation=False
+
 Verified against Pixyz SDK v2026.3.x (rebranded "Unity Asset Transformer SDK").
 The `pxz` Python module and the function names below are unchanged from the
 Pixyz-branded SDK, so this runs fine under the 2026.3.1.1 build.
 
 Docs referenced:
-- Algo functions:
-  https://docs.unity.com/en-us/asset-transformer-sdk/2026.1/api/python/algo_functions
+  https://docs.unity.com/en-us/asset-transformer-sdk/2026.1/api/python/
 """
 
 import argparse
@@ -71,8 +80,9 @@ def parse_tessellation_args(argv):
     falling back to their default when omitted.
     """
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--selectBy", default="name")
-    parser.add_argument("--selectValue", default="")
+    parser.add_argument("--selectBy", default="") #possible values: name, metadata
+    parser.add_argument("--selectValue", default="") 
+    parser.add_argument("--selectKey", default="") #only necesary for Metadata selection
     parser.add_argument("--maxSag", type=float, default=0.2)
     parser.add_argument("--maxLength", type=float, default=-1)
     parser.add_argument("--maxAngle", type=float, default=-1)
@@ -88,6 +98,36 @@ def parse_tessellation_args(argv):
     return parser.parse_args(argv)
 
 
+def selectOccurrences(selectBy, selectValue, selectKey=""):
+    """
+    Resolve which occurrences the tessellation should run on.
+
+    selectBy="Name": occurrences whose built-in "Name" property matches
+        the selectValue regex (see scene.findOccurrencesByProperty).
+    selectBy="Metadata": occurrences whose selectKey metadata property
+        matches the selectValue regex (see scene.findOccurrencesByMetadata).
+    """
+    selectBy = selectBy.strip().lower()
+
+    if selectBy == "name":
+        occurrences = list(scene.findOccurrencesByProperty("Name", selectValue))
+    elif selectBy == "metadata":
+        if not selectKey:
+            sys.exit("selectKey is required when selectBy=Metadata")
+        occurrences = list(scene.findOccurrencesByMetadata(selectKey, selectValue))
+    elif selectBy == "":
+        #if no value is provided, select the scene root
+        occurrences = [scene.getRoot()]
+        
+    else:
+        sys.exit(f"Unsupported selectBy value: {selectBy}")
+
+    if not occurrences:
+        print(f"No occurrences matched selectBy={selectBy}, selectValue={selectValue}, selectKey={selectKey}")
+
+    return occurrences
+
+
 def main():
     tess_args = parse_tessellation_args(sys.argv[1:])
     print (f"Tessellation args: {tess_args}")
@@ -99,9 +139,10 @@ def main():
     for name, value in vars(tess_args).items():
         print(f"  {name} = {value}")
 
-    # select root and apply tessellation using the parsed (or default) parameters
+    # select the target occurrences and apply tessellation using the parsed (or default) parameters
+    occurrences = selectOccurrences(tess_args.selectBy, tess_args.selectValue, tess_args.selectKey)
     algo.tessellate(
-        [scene.getRoot()],
+        occurrences,
         maxSag=tess_args.maxSag,
         maxLength=tess_args.maxLength,
         maxAngle=tess_args.maxAngle,
