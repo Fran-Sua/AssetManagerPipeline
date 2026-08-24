@@ -13,28 +13,48 @@ file, run one or more Pixyz operations on it, and export the processed result.
   - Manual: `.../manual/functions/<topic>`
   - Python API reference: `.../api/python/<module>_functions`
 
-## Common script pattern
-Every script follows roughly the same shape:
+## Common script pattern: modular pipeline nodes
+The scripts in [`Modular_Pipeline/`](Modular_Pipeline/) are each meant to
+run as one "Run Script" node in a Unity Asset Manager pipeline, chained
+together rather than each doing a full import→process→export on their own.
+They hand off scene state through a shared checkpoint file:
 
 ```python
-import pxz
-from pxz import core, scene, io, algo
-
-if pxz.get_current_session() == None:
-    pxz.initialize()
-
-print(f'Pixyz version: {core.getVersion()}')
-core.configureInterfaceLogger(True, True, True)
-core.addConsoleVerbose(core.Verbose.INFO)
-
-root = io.importScene(input_file)
-# ... processing ...
-io.exportScene(output_file, root)
-
-pxz.release()
+TEMP_PIXYZ_FILE_DIR = "/workspace/temp"
+TEMP_FILE_NAME = "resume.pxz"
+TEMP_FILE = os.path.join(TEMP_PIXYZ_FILE_DIR, TEMP_FILE_NAME)
 ```
 
+- `import.py` is the only node that imports a real external source file
+  (path passed via pipeline command-line arguments); it writes the first
+  `resume.pxz`.
+- Every middle node (tessellate, merge/remove parts, make materials
+  metallic, bake AO, …) loads `resume.pxz`, does one focused operation
+  tuned via `--flag=value` command-line arguments, and saves back to
+  `resume.pxz`.
+- `export.py` is the only node that writes real external output files; it
+  loads the final `resume.pxz` and exports it in one or more formats.
+
+There is currently **no shared helper module** — `initPixyz()`,
+`importTemporalPixyzScene()`, and `saveTempPixyzFile()` are duplicated
+verbatim in every script. When adding a new node, copy this boilerplate
+from an existing `Modular_Pipeline/` script rather than reinventing it.
+
+See [`README.md`](README.md) for the full pipeline-usage explanation,
+including how command-line arguments map to the Run Script node's config
+field and a worked multi-node example.
 
 ## Scripts in this directory
-- **`Pixyz_Hello_World.py`** — minimal session init/logging smoke test, no
-  import/export. Good starting skeleton for a new script.
+- [`Modular_Pipeline/`](Modular_Pipeline/) — the actual pipeline nodes
+  (`import.py`, `tessellation.py`, `mergeParts.py`,
+  `removePartsByName.py`, `makeMaterialsMetallic.py`,
+  `bakeAmbientOcclusionTexture.py`, `bakeAmbientOcclusionVertex.py`,
+  `export.py`), all named in camelCase for consistency. See `README.md`
+  for details on each.
+- [`InitialTests/pixyzHelloWorld.py`](InitialTests/pixyzHelloWorld.py)
+  — minimal session init/logging smoke test, no import/export. Good
+  starting skeleton for a new script. Predates the modular pipeline
+  pattern above and isn't wired into the `resume.pxz` convention.
+- [`InitialTests/tessellationTest.py`](InitialTests/tessellationTest.py) —
+  an earlier, non-modular prototype of what became
+  `Modular_Pipeline/tessellation.py`.
