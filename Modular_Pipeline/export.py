@@ -48,11 +48,6 @@ def initPixyz():
     pxz.core.configureInterfaceLogger(True, True, True)
     pxz.core.addConsoleVerbose(core.Verbose.INFO)
 
-def saveTempPixyzFile():
-    #Save model to a temp Pixyz File so it can be resumed in the next step
-    os.makedirs(TEMP_PIXYZ_FILE_DIR, exist_ok=True)
-    print(f"Exporting: {TEMP_FILE}")
-    io.exportScene(TEMP_FILE, scene.getRoot())
 
 def importTemporalPixyzScene():
     output_file = os.path.join(TEMP_PIXYZ_FILE_DIR, TEMP_FILE_NAME)
@@ -64,6 +59,7 @@ def importTemporalPixyzScene():
     print(f"Importing: {TEMP_FILE}")
     io.importScene(TEMP_FILE)
 
+
 def exportFiles(output_dir, fileName, fileFormats):
     for fileFormat in fileFormats:
         output_name = fileName + "." + fileFormat
@@ -72,8 +68,7 @@ def exportFiles(output_dir, fileName, fileFormats):
         io.exportScene(output_file, scene.getRoot())
 
     print("Done.")
-
-    
+  
 
 def main():
 
