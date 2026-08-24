@@ -24,9 +24,11 @@ Because every node follows the same hand-off convention (below), you can
 mix, match, reorder, and repeat nodes to assemble whatever pipeline a given
 job needs — you're not limited to one fixed sequence.
 
-![Pipeline node graph in the Unity Asset Manager pipeline creator](images/01-pipeline-node-graph.png)
-> Screenshot of the full node graph in the Unity Asset Manager pipeline
+<img src="images/01-pipeline-node-graph.png" alt="Pipeline node graph in the Unity Asset Manager pipeline creator" width="40%">
+
+> Node graph in the Unity Asset Manager pipeline
 > creator, showing several Run Script nodes chained in sequence.
+
 
 ## How nodes hand off work to each other
 
@@ -50,14 +52,20 @@ TEMP_FILE = os.path.join(TEMP_PIXYZ_FILE_DIR, TEMP_FILE_NAME)
 So the pattern for any middle node is: load `resume.pxz` → do one focused
 operation → save `resume.pxz` again, overwriting it.
 
-> [!NOTE]
-> **This is a single shared, overwritten filename** — not a unique
-> per-run file — so it isn't safe for pipelines that fan out and run nodes
-> in parallel; it assumes a strictly linear chain. There's also no shared
-> helper module: `initPixyz()`, `importTemporalPixyzScene()`, and
-> `saveTempPixyzFile()` are copy-pasted into every script rather than
-> imported from a common place. If you add a new node, copy this
-> boilerplate from an existing script rather than reinventing it.
+## Creating a node
+
+1. Click the **+** icon to add a step.
+2. Select the **Unity Asset Transformer** app, then **"Execute Custom
+   Script"** from the right panel, and click **Add step**.
+
+<img src="images/05-node-creation-1.png" alt="Adding a Unity Asset Transformer &quot;Execute Custom Script&quot; step" width="50%">
+
+3. In the parameters window on the right, copy/paste one of the scripts
+   from this repo and click **Create**.
+
+<img src="images/05-node-creation-2.png" alt="Pasting a script into the node's parameters window" width="30%">
+
+
 
 ## Fine-tuning a node with command-line arguments
 
@@ -66,30 +74,18 @@ field. Whatever you type there becomes `sys.argv[1:]` for that node's
 script — this is how you tune what a specific node instance does without
 touching the script's code.
 
-![Run Script node configuration panel](images/02-run-script-node-config.png)
+<img src="images/02-run-script-node-config.png" alt="Run Script node configuration panel" width="50%">
+
 > Screenshot of a single Run Script node's configuration panel, with the
 > script path and the command-line arguments field visible.
 
-![Command-line arguments field example](images/03-command-line-arguments-field.png)
+<img src="images/03-command-line-arguments-field.png" alt="Command-line arguments field example" width="50%">
+
 > Close-up of the command-line arguments field populated for the tessellation node,
 > e.g. `--selectBy=name --selectValue=Wheel --maxSag=0.1`.
 
-Two argument shapes show up across the scripts:
 
-- **Plain positional arguments** — used only by `import.py` and
-  `export.py`, since those are the two nodes that talk to real file paths
-  outside the pipeline instead of the shared `resume.pxz` checkpoint.
-  - `import.py` expects a single source file path. It tolerates the
-    pipeline runner literally passing `[ "input.ext" ]` as separate
-    shell-split tokens.
-  - `export.py` expects exactly three: `output_dir`, `fileName`, and a
-    bracketed list of formats, e.g. `/output myPart [glb, fbx]`.
-- **Named `--flag=value` arguments** — used by every processing node in
-  between. All flags are optional with sensible defaults (see the table
-  below), except selector flags like `--names=[...]` which some scripts
-  require.
-
-## Node reference
+## Arguments node reference
 
 | Script | Role | What it does | Example command-line arguments |
 |---|---|---|---|
@@ -102,7 +98,8 @@ Two argument shapes show up across the scripts:
 | [`bakeAmbientOcclusionVertex.py`](Modular_Pipeline/bakeAmbientOcclusionVertex.py) | Intermediate | Bakes AO directly into per-vertex colors. No UVs needed. | `--samples=64 --applyFilter=False` |
 | [`export.py`](Modular_Pipeline/export.py) | Last | Loads the final `resume.pxz` and writes one file per requested format. | `/output/dir myPartName [glb, fbx]` |
 
-## Worked example: assembling a pipeline
+
+## Pipeline example: assembling a pipeline
 
 A pipeline that imports a CAD part, tessellates it, bakes ambient occlusion
 into textures, and exports it as glTF and FBX would be four Run Script
@@ -112,12 +109,32 @@ nodes in this order:
 2. **`tessellation.py`** — args: `--maxSag=0.05 --createNormals=True`
    (tessellation must run *before* the AO texture bake, since that bake
    needs UV coordinates to project onto)
-3. **`bakeAmbientOcclusionTexture.py`** — args: `--resolution=1024 --samples=32`
+3. **`bakeAmbientOcclusionVertex.py`** (no arguments)
 4. **`export.py`** — args: `/output/dir myPart [glb, fbx]`
 
-![End-to-end example pipeline run](images/04-example-pipeline-run.png)
-> Screenshot of this example pipeline's node graph end-to-end, or its run
-> log showing each node's console output.
+<img src="images/04-example-pipeline-run.png" alt="End-to-end example pipeline run" width="40%">
+
+> Example pipeline's node graph end-to-end
+
+## Creating a new pipeline
+
+A good starting point is the **"Optimize and Convert 3D Asset"** template,
+since it already has the steps to get the asset in for transformation and
+to upload the result back to Asset Manager once processed.
+
+1. Go to **Pipelines** in Unity Cloud and click the dropdown, then
+   **"Create pipeline from template"**.
+
+<img src="images/06-pipeline-from-scratch-1.png" alt="Creating a pipeline from a template" width="50%">
+
+2. Click the **"Optimize and Convert 3D Asset"** template.
+
+<img src="images/06-pipeline-from-scratch-2.png" alt="Selecting the Optimize and Convert 3D Asset template" width="50%">
+
+3. Replace the Unity Asset Transformer node with your own custom sequence
+   of modular nodes (see [Creating a node](#creating-a-node) above).
+
+<img src="images/06-pipeline-from-scratch-3.png" alt="Replacing the template's node with a custom modular node sequence" width="30%">
 
 ## Known quirks
 
